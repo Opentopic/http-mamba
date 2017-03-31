@@ -11,7 +11,7 @@ import asyncio
 import csv
 import time
 from itertools import groupby
-from urllib.parse import parse_qs
+from urllib.parse import parse_qsl
 
 import async_timeout
 from aiohttp import ClientSession
@@ -41,7 +41,7 @@ def read_file(default_method, default_url, default_headers, filename):
         reader = csv.DictReader(file)
         for row in reader:
             headers = default_headers.copy()
-            headers.update(parse_qs(row.get('headers'), keep_blank_values=True, strict_parsing=False))
+            headers.update(dict(parse_qsl(row.get('headers'), keep_blank_values=True, strict_parsing=False)))
             yield {'url': row.get('url', default_url),
                    'method': row.get('method', default_method),
                    'headers': headers,
@@ -90,12 +90,15 @@ if __name__ == "__main__":
     parser.add_argument('-u', '--url', help='request a single url')
     parser.add_argument('--headers', help='headers written as query string, ie. name=value&name2=value2')
     parser.add_argument('-n', '--num', help='number of request to perform')
-    parser.add_argument('-c', '--connections', help='max connections')
+    parser.add_argument('-c', '--connections', default=10, help='max simultaneous connections, defaults to 10')
     parser.add_argument('-t', '--timeout', default=30, help='single request timeout, defaults to 30 seconds')
     options = parser.parse_args()
 
     loop = asyncio.get_event_loop()
+    if options.num is not None:
+        options.num = int(options.num)
+    headers = dict(parse_qsl(options.headers))
     future = asyncio.ensure_future(run(int(options.connections), int(options.timeout),
-                                       options.method.lower(), options.url, parse_qs(options.headers), int(options.num),
+                                       options.method.lower(), options.url, headers,options.num,
                                        options.input))
     loop.run_until_complete(future)
