@@ -62,8 +62,17 @@ def get_urls(method, url, headers, number):
                'data': None,
                'file_time': time.perf_counter()}
 
+def report(responses):
+    keyfunc = itemgetter('status')
+    for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
+        times = [response['resp_duration'] for response in group]
+        print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
 
-async def run(connections, timeout, method, url, headers, number, urls_file):
+    times = [response['resp_duration'] for response in responses]
+    print('Avg time: {:.4f}'.format(sum(times) / len(times)))
+
+
+async def run(connections, timeout, method, url, headers, number, urls_file, print_report):
     tasks = []
     responses = []
     sem = asyncio.Semaphore(connections)
@@ -78,18 +87,14 @@ async def run(connections, timeout, method, url, headers, number, urls_file):
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
             if len(tasks) % 1000 == 0:
-                responses.extend(await asyncio.gather(*tasks))
+                responses = await asyncio.gather(*tasks)
+                if print_report:
+                    report(responses)
                 tasks = []
 
-        responses.extend(await asyncio.gather(*tasks))
-
-    keyfunc = itemgetter('status')
-    for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
-        times = [response['resp_duration'] for response in group]
-        print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
-
-    times = [response['resp_duration'] for response in responses]
-    print('Avg time: {:.4f}'.format(sum(times) / len(times)))
+        responses = await asyncio.gather(*tasks)
+        if print_report:
+            report(responses)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='HTTP benchmark utility')
@@ -101,6 +106,7 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--num', help='number of request to perform')
     parser.add_argument('-c', '--connections', default=10, help='max simultaneous connections, defaults to 10')
     parser.add_argument('-t', '--timeout', default=30, help='single request timeout, defaults to 30 seconds')
+    parser.add_argument('-r', '--report', default=False, help='should a report be generated')
     options = parser.parse_args()
 
     loop = asyncio.get_event_loop()
@@ -109,5 +115,5 @@ if __name__ == "__main__":
     headers = dict(parse_qsl(options.headers))
     future = asyncio.ensure_future(run(int(options.connections), int(options.timeout),
                                        options.method.lower(), options.url, headers,options.num,
-                                       options.input))
+                                       options.input, options.report))
     loop.run_until_complete(future)
