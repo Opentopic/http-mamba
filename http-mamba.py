@@ -24,8 +24,13 @@ async def fetch(session, timeout, args):
     with async_timeout.timeout(timeout, loop=session.loop):
         async with session.request(**args) as response:
             resp_time = time.perf_counter()
-            await response.read()
+            exception = None
+            try:
+                await response.read()
+            except Exception as e:
+                exception = e
             return {'status': response.status,
+                    'exception': exception,
                     'file_duration': time.perf_counter() - file_time,
                     'req_duration': time.perf_counter() - req_time,
                     'resp_duration': resp_time - req_time}
@@ -60,6 +65,7 @@ def get_urls(method, url, headers, number):
 
 async def run(connections, timeout, method, url, headers, number, urls_file):
     tasks = []
+    responses = []
     sem = asyncio.Semaphore(connections)
 
     if urls_file:
@@ -71,8 +77,11 @@ async def run(connections, timeout, method, url, headers, number, urls_file):
         for args in urls:
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
+            if len(tasks) % 1000 == 0:
+                responses.extend(await asyncio.gather(*tasks))
+                tasks = []
 
-        responses = await asyncio.gather(*tasks)
+        responses.extend(await asyncio.gather(*tasks))
 
     keyfunc = itemgetter('status')
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
