@@ -82,7 +82,7 @@ def report(responses):
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
         times = [response['resp_duration'] for response in group]
         print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
-        if status < 200 and 400 <= status:
+        if int(status) < 200 or 400 <= int(status):
             print('First response: {}'.format(group[0]['body']))
 
     times = [response['resp_duration'] for response in responses]
