@@ -80,10 +80,15 @@ def report(responses):
     print('Last id and url: {} {}'.format(responses[-1]['index'], responses[-1]['url']))
     keyfunc = itemgetter('status')
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
-        times = [response['resp_duration'] for response in group]
+        times = []
+        first_response = None
+        for response in group:
+            times.append(response['resp_duration'])
+            if first_response is None:
+                first_response = response
         print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
         if int(status) < 200 or 400 <= int(status):
-            print('First response: {}'.format(group[0]['body']))
+            print('First response: {}'.format(first_response['body']))
 
     times = [response['resp_duration'] for response in responses]
     print('Avg time: {:.4f}'.format(sum(times) / len(times)))
