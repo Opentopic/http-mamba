@@ -27,12 +27,13 @@ async def fetch(session, timeout, args):
             resp_time = time.perf_counter()
             exception = None
             try:
-                await response.read()
+                body = await response.read()
             except Exception as e:
                 exception = e
             return {'index': index,
                     'url': args.get('url'),
                     'status': response.status,
+                    'body': body,
                     'exception': exception,
                     'file_duration': time.perf_counter() - file_time,
                     'req_duration': time.perf_counter() - req_time,
@@ -50,6 +51,7 @@ def read_file(default_method, default_url, default_headers, filename, skip):
         i = 0
         for row in reader:
             if skip is not None and i < skip:
+                i += 1
                 continue
             headers = default_headers.copy()
             headers.update(dict(parse_qsl(row.get('headers'), keep_blank_values=True, strict_parsing=False)))
@@ -79,6 +81,8 @@ def report(responses):
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
         times = [response['resp_duration'] for response in group]
         print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
+        if status < 200 and 400 <= status:
+            print('First response: {}'.format(group[0]['body']))
 
     times = [response['resp_duration'] for response in responses]
     print('Avg time: {:.4f}'.format(sum(times) / len(times)))
