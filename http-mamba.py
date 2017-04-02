@@ -26,6 +26,7 @@ async def fetch(session, timeout, args):
         async with session.request(**args) as response:
             resp_time = time.perf_counter()
             exception = None
+            body = None
             try:
                 body = await response.read()
             except Exception as e:
@@ -76,7 +77,7 @@ def get_urls(method, url, headers, number, skip):
 def report(responses):
     if not responses:
         return
-    print('Last id and url: {} {}'.format(responses[-1]['id'], responses[-1]['url']))
+    print('Last id and url: {} {}'.format(responses[-1]['index'], responses[-1]['url']))
     keyfunc = itemgetter('status')
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
         times = [response['resp_duration'] for response in group]
