@@ -19,6 +19,7 @@ from operator import itemgetter
 
 
 async def fetch(session, timeout, args):
+    index = args.pop('index')
     file_time = args.pop('file_time')
     req_time = time.perf_counter()
     with async_timeout.timeout(timeout, loop=session.loop):
@@ -29,7 +30,9 @@ async def fetch(session, timeout, args):
                 await response.read()
             except Exception as e:
                 exception = e
-            return {'status': response.status,
+            return {'index': index,
+                    'url': args.get('url'),
+                    'status': response.status,
                     'exception': exception,
                     'file_duration': time.perf_counter() - file_time,
                     'req_duration': time.perf_counter() - req_time,
@@ -41,28 +44,37 @@ async def bound_fetch(sem, session, timeout, args):
         return await fetch(session, timeout, args)
 
 
-def read_file(default_method, default_url, default_headers, filename):
+def read_file(default_method, default_url, default_headers, filename, skip):
     with open(filename) as file:
         reader = csv.DictReader(file)
+        i = 0
         for row in reader:
+            if skip is not None and i < skip:
+                continue
             headers = default_headers.copy()
             headers.update(dict(parse_qsl(row.get('headers'), keep_blank_values=True, strict_parsing=False)))
-            yield {'url': row.get('url', default_url),
+            yield {'index': i,
+                   'url': row.get('url', default_url),
                    'method': row.get('method', default_method),
                    'headers': headers,
                    'data': row.get('body', ''),
                    'file_time': time.perf_counter()}
+            i += 1
 
 
-def get_urls(method, url, headers, number):
-    for i in range(number):
-        yield {'url': url,
+def get_urls(method, url, headers, number, skip):
+    for i in range(0 if skip is None else skip, number):
+        yield {'index': i,
+               'url': url,
                'method': method,
                'headers': headers,
                'data': None,
                'file_time': time.perf_counter()}
 
 def report(responses):
+    if not responses:
+        return
+    print('Last id and url: {} {}'.format(responses[-1]['id'], responses[-1]['url']))
     keyfunc = itemgetter('status')
     for status, group in groupby(sorted(responses, key=keyfunc), keyfunc):
         times = [response['resp_duration'] for response in group]
@@ -72,15 +84,15 @@ def report(responses):
     print('Avg time: {:.4f}'.format(sum(times) / len(times)))
 
 
-async def run(connections, timeout, method, url, headers, number, urls_file, print_report):
+async def run(connections, timeout, method, url, headers, number, skip, urls_file, print_report):
     tasks = []
     responses = []
     sem = asyncio.Semaphore(connections)
 
     if urls_file:
-        urls = read_file(method, url, headers, urls_file)
+        urls = read_file(method, url, headers, urls_file, skip)
     else:
-        urls = get_urls(method, url, headers, number)
+        urls = get_urls(method, url, headers, number, skip)
 
     async with ClientSession() as session:
         for args in urls:
@@ -104,6 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('-u', '--url', help='request a single url')
     parser.add_argument('--headers', help='headers written as query string, ie. name=value&name2=value2')
     parser.add_argument('-n', '--num', help='number of request to perform')
+    parser.add_argument('-s', '--skip', help='number of lines from input file to skip')
     parser.add_argument('-c', '--connections', default=10, help='max simultaneous connections, defaults to 10')
     parser.add_argument('-t', '--timeout', default=30, help='single request timeout, defaults to 30 seconds')
     parser.add_argument('-r', '--report', default=False, help='should a report be generated')
@@ -112,8 +125,10 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     if options.num is not None:
         options.num = int(options.num)
+    if options.skip is not None:
+        options.skip = int(options.skip)
     headers = dict(parse_qsl(options.headers))
     future = asyncio.ensure_future(run(int(options.connections), int(options.timeout),
-                                       options.method.lower(), options.url, headers,options.num,
+                                       options.method.lower(), options.url, headers, options.num, options.skip,
                                        options.input, options.report))
     loop.run_until_complete(future)
