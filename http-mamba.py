@@ -15,7 +15,27 @@ from urllib.parse import parse_qsl
 
 import async_timeout
 from aiohttp import ClientSession
+from aiohttp.abc import AbstractCookieJar
 from operator import itemgetter
+
+
+class NullCookieJar(AbstractCookieJar):
+    """A null cookie storage, stores nothing and returns nothing."""
+
+    def __iter__(self):
+        raise StopIteration
+
+    def __len__(self):
+        return 0
+
+    def clear(self):
+        pass
+
+    def update_cookies(self, cookies, response_url=None):
+        pass
+
+    def filter_cookies(self, request_url):
+        return None
 
 
 async def fetch(session, timeout, args):
@@ -104,7 +124,7 @@ async def run(connections, timeout, method, url, headers, number, skip, urls_fil
     else:
         urls = get_urls(method, url, headers, number, skip)
 
-    async with ClientSession() as session:
+    async with ClientSession(cookie_jar=NullCookieJar()) as session:
         for args in urls:
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
