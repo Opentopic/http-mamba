@@ -3,8 +3,9 @@ Based on:
 https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
 
 Added:
-* timings
+* timing and reporting
 * params, including reading from file
+* disable cookies
 """
 import argparse
 import asyncio
@@ -94,6 +95,7 @@ def get_urls(method, url, headers, number, skip):
                'data': None,
                'file_time': time.perf_counter()}
 
+
 def report(responses):
     if not responses:
         return
@@ -116,7 +118,6 @@ def report(responses):
 
 async def run(connections, timeout, method, url, headers, number, skip, urls_file, print_report):
     tasks = []
-    responses = []
     sem = asyncio.Semaphore(connections)
 
     if urls_file:
@@ -128,7 +129,7 @@ async def run(connections, timeout, method, url, headers, number, skip, urls_fil
         for args in urls:
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
-            if len(tasks) % 1000 == 0:
+            if len(tasks) % (100 * connections) == 0:
                 responses = await asyncio.gather(*tasks)
                 if print_report:
                     report(responses)
@@ -149,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--skip', help='number of lines from input file to skip')
     parser.add_argument('-c', '--connections', default=10, help='max simultaneous connections, defaults to 10')
     parser.add_argument('-t', '--timeout', default=30, help='single request timeout, defaults to 30 seconds')
-    parser.add_argument('-r', '--report', default=False, help='should a report be generated')
+    parser.add_argument('-r', '--report', action='store_true', help='should a report be generated')
     options = parser.parse_args()
 
     loop = asyncio.get_event_loop()
