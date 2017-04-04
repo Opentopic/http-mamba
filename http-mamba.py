@@ -67,7 +67,7 @@ async def bound_fetch(sem, session, timeout, args):
         return await fetch(session, timeout, args)
 
 
-def read_file(default_method, default_url, default_headers, filename, skip):
+def read_file(default_method, default_url, default_headers, filename, number, skip):
     with open(filename) as file:
         reader = csv.DictReader(file)
         i = 0
@@ -75,6 +75,8 @@ def read_file(default_method, default_url, default_headers, filename, skip):
             if skip is not None and i < skip:
                 i += 1
                 continue
+            if i >= number - (0 if skip is None else skip):
+                break
             headers = default_headers.copy()
             headers.update(dict(parse_qsl(row.get('headers'), keep_blank_values=True, strict_parsing=False)))
             yield {'index': i,
@@ -127,7 +129,7 @@ async def run(connections, timeout, method, url, headers, number, skip, urls_fil
     sem = asyncio.Semaphore(connections)
 
     if urls_file:
-        urls = read_file(method, url, headers, urls_file, skip)
+        urls = read_file(method, url, headers, urls_file, number, skip)
     else:
         urls = get_urls(method, url, headers, number, skip)
 
