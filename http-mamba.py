@@ -108,7 +108,7 @@ def report(responses, total_time):
             times.append(response['resp_duration'])
             if first_response is None:
                 first_response = response
-        print('Status {}: {} responses, times avg/min/max: {:.4f}/{:.4f}/{:.4f}'.format(
+        print('Status {}: {} responses, times avg/min/max: {:.4f} / {:.4f} / {:.4f}'.format(
             status, len(times), sum(times) / len(times), min(times), max(times)
         ))
         if int(status) < 200 or 400 <= int(status):
@@ -116,7 +116,7 @@ def report(responses, total_time):
             print('  first body: {}'.format(first_response['body']))
 
     times = [response['resp_duration'] for response in responses]
-    print('Total time: {:.4f}, req/s: {:.4f}, times avg/min/max: {:.4f}/{:.4f}/{:.4f}'.format(
+    print('Total time: {:.4f}, req/s: {:.4f}, times avg/min/max: {:.4f} / {:.4f} / {:.4f}'.format(
         total_time, len(responses) / total_time, sum(times) / len(times), min(times), max(times)
     ))
     print()
