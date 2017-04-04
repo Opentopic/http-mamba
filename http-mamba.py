@@ -75,7 +75,7 @@ def read_file(default_method, default_url, default_headers, filename, number, sk
             if skip is not None and i < skip:
                 i += 1
                 continue
-            if i >= number - (0 if skip is None else skip):
+            if number is not None and i >= number - (0 if skip is None else skip):
                 break
             headers = default_headers.copy()
             headers.update(dict(parse_qsl(row.get('headers'), keep_blank_values=True, strict_parsing=False)))
