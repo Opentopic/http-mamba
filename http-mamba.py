@@ -108,14 +108,18 @@ def report(responses, total_time):
             times.append(response['resp_duration'])
             if first_response is None:
                 first_response = response
-        print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
+        print('Status {}: {} responses, times avg/min/max: {:.4f}/{:.4f}/{:.4f}'.format(
+            status, len(times), sum(times) / len(times), min(times), max(times)
+        ))
         if int(status) < 200 or 400 <= int(status):
-            print('First response:')
-            print('  url: {}'.format(first_response['url']))
-            print('  body: {}'.format(first_response['body']))
+            print('  first url: {}'.format(first_response['url']))
+            print('  first body: {}'.format(first_response['body']))
 
     times = [response['resp_duration'] for response in responses]
-    print('Total time: {:.4f}, req/s: {:.4f}, avg time: {:.4f}'.format(total_time, len(responses) / total_time, sum(times) / len(times)))
+    print('Total time: {:.4f}, req/s: {:.4f}, times avg/min/max: {:.4f}/{:.4f}/{:.4f}'.format(
+        total_time, len(responses) / total_time, sum(times) / len(times), min(times), max(times)
+    ))
+    print()
 
 
 async def run(connections, timeout, method, url, headers, number, skip, urls_file, print_report):
@@ -128,10 +132,16 @@ async def run(connections, timeout, method, url, headers, number, skip, urls_fil
         urls = get_urls(method, url, headers, number, skip)
 
     async with ClientSession(cookie_jar=NullCookieJar()) as session:
+        warmup_start = time.perf_counter()
+        warmup_end = None
         for args in urls:
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
             if len(tasks) % (100 * connections) == 0:
+                if warmup_end is None and print_report:
+                    warmup_end = time.perf_counter()
+                    print('Warmup time: {:.4f}'.format(warmup_end - warmup_start))
+                    print()
                 start_time = time.perf_counter()
                 responses = await asyncio.gather(*tasks)
                 if print_report:
