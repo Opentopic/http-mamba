@@ -44,7 +44,7 @@ async def fetch(session, timeout, args):
     file_time = args.pop('file_time')
     req_time = time.perf_counter()
     with async_timeout.timeout(timeout, loop=session.loop):
-        async with session.request(**args) as response:
+        async with session.request(allow_redirects=False, **args) as response:
             resp_time = time.perf_counter()
             exception = None
             body = None
