@@ -96,7 +96,7 @@ def get_urls(method, url, headers, number, skip):
                'file_time': time.perf_counter()}
 
 
-def report(responses):
+def report(responses, total_time):
     if not responses:
         return
     print('Last id and url: {} {}'.format(responses[-1]['index'], responses[-1]['url']))
@@ -110,10 +110,12 @@ def report(responses):
                 first_response = response
         print('Status {}: {} responses, avg {:.4f} time'.format(status, len(times), sum(times) / len(times)))
         if int(status) < 200 or 400 <= int(status):
-            print('First response: {}'.format(first_response['body']))
+            print('First response:')
+            print('  url: {}'.format(first_response['url']))
+            print('  body: {}'.format(first_response['body']))
 
     times = [response['resp_duration'] for response in responses]
-    print('Avg time: {:.4f}'.format(sum(times) / len(times)))
+    print('Total time: {:.4f}, req/s: {:.4f}, avg time: {:.4f}'.format(total_time, len(responses) / total_time, sum(times) / len(times)))
 
 
 async def run(connections, timeout, method, url, headers, number, skip, urls_file, print_report):
@@ -130,14 +132,16 @@ async def run(connections, timeout, method, url, headers, number, skip, urls_fil
             task = asyncio.ensure_future(bound_fetch(sem, session, timeout, args))
             tasks.append(task)
             if len(tasks) % (100 * connections) == 0:
+                start_time = time.perf_counter()
                 responses = await asyncio.gather(*tasks)
                 if print_report:
-                    report(responses)
+                    report(responses, time.perf_counter() - start_time)
                 tasks = []
 
+        start_time = time.perf_counter()
         responses = await asyncio.gather(*tasks)
         if print_report:
-            report(responses)
+            report(responses, time.perf_counter() - start_time)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='HTTP benchmark utility')
